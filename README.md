@@ -7,7 +7,6 @@
 Modern web applications often bundle and minify their JavaScript code. While this is great for performance, the associated source map files can inadvertently expose the original source code, including comments, variable names, and potentially sensitive information. JSMap Inspector provides a user-friendly interface to navigate this exposed code, search for critical data, and understand the structure of the bundled application – **all completely offline within your browser.**
 
 ![JSMap Inspector Screenshot](JSMapInspector.png.jpg) 
-*(Replace with a compelling screenshot of the tool in action)*
 
 ---
 
@@ -93,5 +92,6 @@ Distributed under the MIT License. See `LICENSE` file for more information *(<- 
 ---
 
 ## Contact 👤
+
 
 Created by **Mitsec** - [@ynsmroztas](https://x.com/ynsmroztas)
