@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>JSMap Inspector</title>
+  <style>
+    :root {
+      --main-bg: #101010;
+      --header-bg: #151515;
+      --tree-bg: #101010;
+      --preview-bg: #1a1a1a; /* Hafif açıldı */
+      --results-bg: #181818;
+      --splitter-bg: #333;
+      --text-color: #a8ff60;
+      --text-green: #66ff99;
+      --text-cyan: #99ffcc;
+      --text-link: #66ccff;
+      --text-muted: #666;
+      --border-color: #333;
+      --input-bg: #202020;
+      --input-border: #555;
+      --input-focus: #a8ff60;
+      --hacker-green: #0f0;
+      --highlight-bg: #a8ff60;
+      --highlight-fg: #101010;
+      --tab-bg: #202020;
+      --tab-active-bg: #1a1a1a; /* preview bg ile aynı */
+      --tab-hover-bg: #2d2d2d;
+      --line-highlight-bg: rgba(168, 255, 96, 0.15); 
+      --glow-color: rgba(168, 255, 96, 0.5); 
+      
+      --icon-color-js: #f0db4f;
+      --icon-color-ts: #007acc;
+      --icon-color-html: #e34c26;
+      --icon-color-css: #563d7c;
+      --icon-color-json: #f90;
+      --icon-color-vue: #42b883;
+      --icon-color-md: #ccc;
+      --icon-color-default: #999;
+    }
+    
+    body {
+      font-family: monospace;
+      margin: 0;
+      background: var(--main-bg);
+      color: var(--text-color);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden; 
+      font-synthesis: none; 
+      position: relative; 
+    }
+    
+    body::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+      background-size: 100% 4px, 6px 100%;
+      z-index: 1002; 
+      pointer-events: none; 
+      opacity: 0.15; /* Biraz daha belirgin */
+    }
+
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: var(--results-bg); }
+    ::-webkit-scrollbar-thumb { 
+      background: var(--hacker-green);
+      opacity: 0.7;
+      border-radius: 5px;
+      border: 2px solid var(--results-bg);
+    }
+    ::-webkit-scrollbar-thumb:hover { 
+      background: var(--input-focus);
+      opacity: 1;
+    }
+
+    header {
+      background: var(--header-bg);
+      padding: 10px 15px; /* Padding artırıldı */
+      display: flex;
+      gap: 20px; /* Gruplar arası boşluk artırıldı */
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border-color);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3); /* Gölge artırıldı */
+      z-index: 10; 
+      align-items: center; 
+    }
+    .header-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    /* Ayırıcılar kaldırıldı, gruplar arası boşluk yeterli */
+
+    input, button, select {
+      background: var(--input-bg);
+      color: var(--text-color);
+      border: 1px solid var(--input-border);
+      padding: 6px 10px; /* Padding ayarlandı */
+      border-radius: 4px; 
+      transition: all 0.2s ease; 
+    }
+    button:hover, select:hover {
+      border-color: var(--input-focus);
+      background: #2a2a2a;
+      cursor: pointer;
+    }
+    input:focus, button:focus, select:focus {
+      outline: none;
+      border-color: var(--input-focus);
+      box-shadow: 0 0 8px var(--glow-color);
+    }
+
+    /* Collapse / Expand */
+    .tree-controls button {
+      background: #222;
+      font-size: 14px; /* Büyütüldü */
+      padding: 4px 8px;
+      line-height: 1;
+      width: 28px; /* Sabit genişlik */
+      text-align: center;
+    }
+
+    #searchInput, #regexInput {
+      font-family: monospace;
+      background: #000;
+      color: var(--hacker-green);
+      border: 1px solid var(--hacker-green);
+      padding: 6px 10px;
+      width: 200px;
+    }
+    
+    /* URL Input Stilleri kaldırıldı */
+    
+    #content-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    main {
+      flex: 1; 
+      display: flex;
+      overflow: hidden;
+      min-height: 200px; 
+    }
+    #treeView {
+      width: 35%;
+      overflow-y: auto;
+      border-right: 1px solid var(--border-color);
+      padding: 10px;
+      min-width: 200px;
+      max-width: 80%;
+      background: var(--tree-bg);
+    }
+    #treeView ul {
+       padding-left: 25px; 
+    }
+    
+    #splitter-v {
+      width: 5px;
+      background: var(--splitter-bg);
+      cursor: col-resize;
+      transition: background 0.2s ease;
+    }
+    #splitter-v:hover { 
+      background: var(--input-focus); 
+      box-shadow: 0 0 8px var(--glow-color); 
+    }
+
+    #preview-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--preview-bg);
+    }
+    
+    #tab-bar-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--main-bg);
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+    }
+    #tab-bar {
+      display: flex;
+      flex-grow: 1;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    .tab {
+      padding: 8px 12px;
+      background: var(--tab-bg);
+      border-right: 1px solid var(--border-color);
+      cursor: pointer;
+      color: #ccc;
+      white-space: nowrap;
+      position: relative;
+      border-top: 2px solid transparent; 
+      transition: background-color 0.2s ease, color 0.2s ease; /* Yumuşak geçiş */
+    }
+    .tab:hover { background: var(--tab-hover-bg); color: #fff; }
+    .tab.active {
+      background: var(--tab-active-bg);
+      color: var(--input-focus);
+      border-top: 2px solid var(--input-focus);
+    }
+    .tab-name { padding-right: 15px; }
+    .tab-close {
+      position: absolute; right: 5px; top: 50%;
+      transform: translateY(-50%); font-size: 14px;
+      line-height: 1; padding: 2px 4px; border-radius: 3px;
+    }
+    .tab-close:hover { background: rgba(255,255,255,0.2); }
+
+    #wordWrapButton {
+      background: none;
+      border: 1px solid var(--input-border);
+      color: var(--text-muted);
+      padding: 4px 8px;
+      margin: 0 5px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    #wordWrapButton.active, #wordWrapButton:hover {
+      color: var(--text-color);
+      border-color: var(--text-color);
+    }
+
+    #preview-content {
+      flex: 1;
+      color: #ccc;
+      overflow-y: auto;
+      /* Subtle pattern */
+      background-image: linear-gradient(45deg, #1f1f1f 25%, transparent 25%), linear-gradient(-45deg, #1f1f1f 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1f1f1f 75%), linear-gradient(-45deg, transparent 75%, #1f1f1f 75%);
+      background-size: 10px 10px;
+      background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+    }
+    #preview-content.word-wrap pre code {
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    #preview-content pre code {
+      padding: 15px;
+      display: block;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+      background: rgba(25, 25, 25, 0.9); /* Desen üstüne hafif transparan */
+      border-radius: 3px;
+    }
+    .code-line {
+      display: block;
+      padding-left: 10px;
+      margin-left: -10px;
+      border-left: 2px solid transparent; 
+    }
+    .code-line.line-highlight { 
+      background: var(--line-highlight-bg);
+      border-left-color: var(--input-focus);
+    }
+    
+    #splitter-h {
+      height: 5px;
+      background: var(--splitter-bg);
+      cursor: row-resize;
+      transition: background 0.2s ease;
+    }
+    #splitter-h:hover { 
+      background: var(--input-focus); 
+      box-shadow: 0 0 8px var(--glow-color); 
+    }
+    
+    #bottom-panel {
+      display: flex;
+      flex-direction: column;
+      background: var(--results-bg);
+      height: 200px;
+      min-height: 50px;
+      max-height: 70%;
+      border-top: 1px solid var(--border-color);
+    }
+    #bottom-panel-tabs {
+      display: flex;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .bottom-tab {
+      padding: 6px 12px;
+      cursor: pointer;
+      color: var(--text-muted);
+      background: var(--main-bg);
+      border-right: 1px solid var(--border-color);
+      border-top: 2px solid transparent; 
+      transition: all 0.2s ease; 
+      margin-bottom: -1px; /* Overlap border */
+    }
+    .bottom-tab:hover { background: #2a2a2a; color: var(--text-color); }
+    .bottom-tab.active {
+      color: var(--input-focus);
+      background: var(--results-bg); 
+      border-top: 2px solid var(--input-focus);
+      border-bottom-color: var(--results-bg); 
+    }
+    #bottom-panel-content {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+    .bottom-panel-page { display: none; }
+    .bottom-panel-page.active { display: block; }
+
+    .folder, .file {
+      cursor: pointer;
+      padding: 3px 0; 
+      display: flex; 
+      align-items: center; 
+      border-radius: 3px; 
+      transition: background-color 0.1s ease; 
+    }
+    .folder:hover, .file:hover {
+      background-color: rgba(168, 255, 96, 0.05);
+    }
+    .folder { color: var(--text-green); }
+    .file {
+      color: var(--text-cyan);
+      text-decoration: none; /* Alt çizgiyi kaldır */
+      padding-left: 4px; 
+      padding-right: 4px;
+    }
+    .file:hover {
+      text-decoration: underline; /* Sadece hover'da alt çizgi */
+    }
+    .file.active-file {
+      background: var(--highlight-bg);
+      color: var(--highlight-fg);
+      font-weight: bold;
+      text-decoration: none;
+    }
+    .folder::before { 
+      content: '📁 '; 
+      opacity: 0.7; 
+      display: inline-block;
+      width: 16px; 
+    }
+    .folder.open::before { 
+      content: '📂 '; 
+      opacity: 1; 
+      width: 16px;
+    }
+    
+    .file::before {
+      content: '';
+      display: inline-block;
+      min-width: 16px; 
+      width: 16px;
+      height: 16px;
+      margin-right: 6px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      vertical-align: middle;
+      opacity: 0.9;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23999' d='M9.5 0H4v16h8V4.5L9.5 0zM11 5V1.5L14.5 5H11z'/%3E%3C/svg%3E");
+    }
+    .file-js::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23f0db4f' d='M0 0h16v16H0z'/%3E%3Cpath fill='%23000' d='M10.84 10.6c.38.62.58 1.3.58 2.04 0 .9-.22 1.66-.66 2.28-.44.6-1.08.9-1.9.9-.86 0-1.54-.28-2.04-.84-.5-.58-.75-1.3-.75-2.18 0-.8.2-1.5.62-2.06.4-.58 1-.88 1.78-.88.64 0 1.2.17 1.68.5.48.35.8.77.98 1.28l-1.38.66c-.08-.28-.2-.5-.38-.66-.18-.16-.42-.24-.72-.24-.44 0-.8.15-1.08.45-.28.3-.42.7-.42 1.2 0 .48.14.88.42 1.2.28.3.64.46 1.08.46.4 0 .74-.12 1.02-.38.28-.24.42-.56.42-.96 0-.3-.06-.58-.18-.84l-2.7-3.64H12L10.84 10.6zM7.22 14.8V9.92h1.44v.94c.2-.36.46-.65.78-.88.32-.22.7-.34 1.14-.34.6 0 1.1.15 1.5.46.4.3.7.7.9 1.2l-1.38.7c-.08-.3-.2-.55-.38-.7-.18-.18-.42-.26-.72-.26-.38 0-.7.13-1 .38-.28.25-.42.6-.42 1.06v2.24H7.22z'/%3E%3C/svg%3E"); }
+    .file-ts::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23007acc' d='M0 0h16v16H0z'/%3E%3Cpath fill='%23FFF' d='M9.42 14.8H7.22V9.92h1.44v.94c.2-.36.46-.65.78-.88.32-.22.7-.34 1.14-.34.6 0 1.1.15 1.5.46.4.3.7.7.9 1.2l-1.38.7c-.08-.3-.2-.55-.38-.7-.18-.18-.42-.26-.72-.26-.38 0-.7.13-1 .38-.28.25-.42.6-.42 1.06v2.24zm-3.8-3.32c.4-.6.6-1.3.6-2.12 0-.8-.2-1.5-.6-2.08-.4-.58-1-.87-1.78-.87-.8 0-1.4.3-1.8.9s-.6 1.36-.6 2.28c0 .9.2 1.66.6 2.28.4.6.98.9 1.78.9.8 0 1.4-.3 1.8-.9zm-1.18 1.3c-.3.3-.64.44-1.04.44-.44 0-.8-.14-1.1-.44-.3-.3-.44-.7-.44-1.2 0-.5.14-.9.42-1.2s.64-.46 1.1-.46c.46 0 .82.15 1.1.46.3.3.44.7.44 1.2 0 .5-.14.9-.42 1.2z'/%3E%3C/svg%3E"); }
+    .file-html::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23e34c26' d='M1.5 0h13L13 13.5l-5 2.5-5-2.5L1.5 0z'/%3E%3Cpath fill='%23f16529' d='M8 1.4v12.8l4-2L12.6 1.4H8z'/%3E%3Cpath fill='%23ebebeb' d='M8 7.3V4.6h3.6L11.4 6H8v1.3zm0 4.1V9h3.4l-.3 1.3-3.1 1.1v-1.4z'/%3E%3Cpath fill='%23fff' d='M8 7.3H5.4l-.2-1.3H8V4.6H3.6l.4 4.4H8v-1.7zm0 1.7H5l.2 2.3 2.8 1v-1.4L5.8 11l-.1-1.3H8z'/%3E%3C/svg%3E"); }
+    .file-css::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23563d7c' d='M1.5 0h13L13 13.5l-5 2.5-5-2.5L1.5 0z'/%3E%3Cpath fill='%23fff' d='M11.6 4.3l-.1.6-3.2.9v.1l3 .8.2 1-4.2 1.6-4.2-1.6.3-1.6 3.9 1.5.1-.1-3.9-1.5.2-1.1 3.9 1.5.1-.1-3.8-1.4.3-1.5 8.1 3z'/%3E%3C/svg%3E"); }
+    .file-json::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23f90' d='M9.5 0H4v16h8V4.5L9.5 0zM11 5V1.5L14.5 5H11z'/%3E%3Cpath fill='%23000' opacity='.6' d='M6.2 12.1c0 .7-.2 1.2-.5 1.5-.3.3-.8.5-1.3.5s-.9-.2-1.3-.5c-.3-.3-.5-.8-.5-1.5s.2-1.2.5-1.5c.3-.3.8-.5 1.3-.5s.9.2 1.3.5c.3.3.5.8.5 1.5zm3.2-1.9c-.2.2-.4.4-.7.5-.3.2-.6.2-.9.2s-.7-.1-1-.2c-.3-.1-.5-.3-.7-.5l.7-1c.1.1.3.2.5.3.2.1.4.1.6.1s.4 0 .6-.1c.2-.1.3-.2.3-.4 0-.1-.1-.2-.3-.3-.1-.1-.3-.1-.6-.2-.3 0-.6-.1-.8-.2-.2-.1-.4-.3-.5-.4-.1-.2-.2-.4-.2-.6 0-.3.1-.6.3-.8.2-.2.5-.3.8-.3s.5.1.8.3.4.4.5.6l-.7.4c0-.1-.1-.2-.2-.2-.1-.1-.3-.1-.4-.1s-.3 0-.4.1c-.1.1-.2.1-.2.3s.1.2.2.3c.1.1.3.1.6.2.3 0 .6.1.8.2.2.1.4.3.5.4.1.2.2.4.2.6 0 .4-.1.7-.3.9-.2.2-.5.4-.8.4s-.7-.1-1-.3c-.3-.2-.5-.4-.7-.6l.7-1zM11 12.1c0 .7-.2 1.2-.5 1.5-.3.3-.8.5-1.3.5s-.9-.2-1.3-.5c-.3-.3-.5-.8-.5-1.5s.2-1.2.5-1.5c.3-.3.8-.5 1.3-.5s.9.2 1.3.5c.3.3.5.8.5 1.5z'/%3E%3C/svg%3E"); }
+    .file-vue::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 221'%3E%3Cpath fill='%2342b883' d='M204.8 0L128 135.2L51.2 0H0l128 220.8L256 0h-51.2z'/%3E%3Cpath fill='%2335495e' d='M51.2 0L128 135.2L204.8 0h-51.2L128 48L102.4 0H51.2z'/%3E%3C/svg%3E"); }
+    .file-md::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23ccc' d='M1 1v14h14V1H1zm10.3 9.7l-1.9 1.9-1.9-1.9L5.6 12l2.4 2.4L13 12l-1.7-1.3zM3.4 10V6L2 7.4V5.7l1.4-1.4h1.4v5.7H3.4z'/%3E%3C/svg%3E"); }
+
+    .hidden { display: none; }
+    pre code { font-size: 14px; line-height: 1.5em; }
+    
+    footer {
+      background: var(--header-bg);
+      color: var(--text-muted);
+      padding: 5px 10px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+    footer a { color: #888; }
+    #statusFileName { color: #ccc; }
+    #statusFileCount { color: #999; }
+    
+    #results-search {
+      padding: 5px 10px;
+    }
+    .terminal-output {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .terminal-file-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .terminal-file-path {
+      color: var(--text-cyan);
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .terminal-snippet {
+      padding-left: 15px;
+      display: block;
+      color: #ccc;
+      cursor: pointer;
+      text-decoration: none;
+      line-height: 1.6em;
+      border-radius: 3px;
+    }
+    .terminal-snippet:hover { background: var(--tab-hover-bg); }
+    .terminal-snippet .line-num {
+      color: var(--text-muted);
+      margin-right: 10px;
+      width: 40px;
+      display: inline-block;
+      text-align: right;
+    }
+    .terminal-snippet .match-highlight {
+      background: var(--highlight-bg);
+      color: var(--highlight-fg);
+      border-radius: 2px;
+    }
+
+    .highlight { background-color: var(--highlight-bg); color: var(--highlight-fg); font-weight: bold; border-radius: 2px; }
+    
+    #loader {
+      position: fixed; left: 0; top: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9); display: none; 
+      justify-content: center; align-items: center; z-index: 100;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .loader-ascii {
+      font-size: 1.5em; 
+      color: var(--hacker-green);
+      animation: blink 1s infinite;
+      text-shadow: 0 0 5px var(--glow-color); 
+    }
+    #loader-text {
+      font-size: 1.2em;
+      color: var(--text-color);
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    #drop-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      z-index: 999;
+      display: none; 
+      justify-content: center;
+      align-items: center;
+      border: 3px dashed var(--input-focus);
+      color: var(--input-focus);
+      font-size: 2em;
+      animation: pulse 2s infinite ease-in-out; 
+    }
+    @keyframes pulse { 
+      0% { opacity: 0.7; }
+      50% { opacity: 1; }
+      100% { opacity: 0.7; }
+    }
+    
+    #context-menu {
+      position: fixed;
+      display: none; 
+      background: #2a2a2a;
+      border: 1px solid var(--input-border);
+      border-radius: 4px;
+      padding: 5px 0;
+      z-index: 1000;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    #context-menu div {
+      padding: 8px 15px;
+      color: var(--text-cyan);
+      cursor: pointer;
+    }
+    #context-menu div:hover {
+      background: var(--input-focus);
+      color: var(--highlight-fg);
+    }
+
+  </style>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/monokai-sublime.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  
+  <script>hljs.highlightAll();</script>
+</head>
+<body>
+
+  <div id="loader">
+    <div class="loader-ascii">[▓▓▓▓▓▓▓▓▓▓]</div>
+    <div id="loader-text">Analyzing...</div>
+  </div>
+  
+  <div id="drop-overlay">Drop .js.map file here</div>
+  <div id="context-menu"></div>
+  
+  <header>
+    <div class="header-group">
+      <input type="file" id="fileInput" accept=".map">
+      <span style="color: var(--text-muted); font-size: 12px;">or Drop File</span>
+    </div>
+    <div class="header-group">
+      <input type="text" id="searchInput" placeholder="Search files...">
+      Collapse / Expand
+      <div class="tree-controls">
+        <button id="collapseAll" title="Collapse All">▸</button>
+        <button id="expandAll" title="Expand All">▾</button>
+      </div>
+    </div>
+    <div class="header-group">
+      <input type="text" id="regexInput" placeholder="Regex search in contents...">
+      <select id="predefinedRegexSelect">
+        <option value="">Select Predefined Regex...</option>
+        <optgroup label="Credentials & Secrets">
+            <option value="API_KEY|api_key|APIKEY|apikey|SECRET|secret|AUTH_TOKEN|authtoken">API/Secret Key/Token</option>
+            <option value="PASSWORD|password|PASS|pass|PWD|pwd">Password</option>
+            <option value="-{5}BEGIN\s+(RSA|EC|PGP|OPENSSH)\s+PRIVATE\s+KEY-{5}">Private Key Block</option>
+            <option value="(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}">AWS Access Key ID</option>
+            <option value="AIza[0-9A-Za-z-_]{35}">Google Cloud API Key</option>
+            <option value="eyJ[A-Za-z0-9-_=]+\.eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*">JSON Web Token (JWT)</option>
+        </optgroup>
+        <optgroup label="Network & Infrastructure">
+            <option value="ENDPOINT|endpoint|URL|url|http:|https:|ftp:|wss:">Endpoint/URL</option>
+            <option value="(mongodb(?:srv)?:\/\/|postgres:\/\/|mysql:\/\/|redis:\/\/|DATABASE_URL|DB_HOST|DB_USER)">DB/Service Connection</option>
+            <option value=":[0-9]{2,5}\b">Port Number (e.g., :8080)</option>
+            <option value="\b(3306|5432|1433|27017|6379|9200|11211)\b">Common Service Ports</option>
+            <option value="\b(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b">Internal IPv4 Address</option>
+         </optgroup>
+         <optgroup label="Personal Information">
+             <option value="\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b">Email Address</option>
+         </optgroup>
+         <optgroup label="Development Artifacts">
+            <option value="(SELECT\s.*\sFROM|INSERT\s.*\sINTO|UPDATE\s.*\sSET|DELETE\s.*\sFROM)">SQL Keywords</option>
+            <option value="\b(TODO|FIXME|XXX|HACK)\b:?">Developer Comments</option>
+        </optgroup>
+      </select>
+      <button id="searchPredefined">Search</button>
+      <button id="extractDomains">Domains</button>
+    </div>
+  </header>
+
+  <div id="content-wrapper">
+    <main>
+      <div id="treeView"></div>
+      <div id="splitter-v"></div>
+      
+      <div id="preview-container">
+        <div id="tab-bar-container">
+          <div id="tab-bar"></div>
+          <button id="wordWrapButton" title="Toggle Word Wrap">Wrap</button>
+        </div>
+        <div id="preview-content"><i>Source content will be displayed here</i></div>
+      </div>
+
+    </main>
+    <div id="splitter-h"></div>
+    
+    <div id="bottom-panel">
+      <div id="bottom-panel-tabs">
+        <div class="bottom-tab active" data-tab-page="results-search">Search</div>
+        <div class="bottom-tab" data-tab-page="results-domains">Domains</div>
+      </div>
+      <div id="bottom-panel-content">
+        <div id="results-search" class="bottom-panel-page active"><i>Regex search results will appear here</i></div>
+        <div id="results-domains" class="bottom-panel-page"><i>Extracted domains will appear here</i></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div>
+      <span id="statusFileName">No file loaded</span>
+      (<span id="statusFileCount">0 files</span>)
+    </div>
+    <span>
+      Powered by mitsec — <a href="https://x.com/ynsmroztas" target="_blank" style="color: #888;">x.com/ynsmroztas</a>
+    </span>
+  </footer>
+
+  <script>
+    let treeView, searchInput, regexInput, fileInput, loader, splitterV, splitterH;
+    let mainPanel, expandAllButton, collapseAllButton, statusFileName, statusFileCount;
+    let tabBar, previewContent, wordWrapButton, dropOverlay, contextMenu;
+    let bottomPanel, bottomPanelTabs, bottomPanelContent, resultsSearchDiv, resultsDomainsDiv;
+    let searchPredefinedButton, extractDomainsButton;
+    let loaderInterval, loaderText;
+    // URL Input değişkenleri kaldırıldı
+
+    let fileContents = {};
+    let currentActiveFileSpan = null; 
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // --- Element Referanslarını Atama ---
+      treeView = document.getElementById("treeView");
+      searchInput = document.getElementById("searchInput");
+      regexInput = document.getElementById("regexInput");
+      fileInput = document.getElementById("fileInput");
+      loader = document.getElementById("loader");
+      splitterV = document.getElementById("splitter-v");
+      splitterH = document.getElementById("splitter-h");
+      mainPanel = document.querySelector("main"); 
+      expandAllButton = document.getElementById("expandAll");
+      collapseAllButton = document.getElementById("collapseAll");
+      statusFileName = document.getElementById("statusFileName");
+      statusFileCount = document.getElementById("statusFileCount");
+      tabBar = document.getElementById("tab-bar");
+      previewContent = document.getElementById("preview-content");
+      wordWrapButton = document.getElementById("wordWrapButton"); 
+      dropOverlay = document.getElementById("drop-overlay"); 
+      contextMenu = document.getElementById("context-menu"); 
+      bottomPanel = document.getElementById("bottom-panel");
+      bottomPanelTabs = document.getElementById("bottom-panel-tabs");
+      bottomPanelContent = document.getElementById("bottom-panel-content");
+      resultsSearchDiv = document.getElementById("results-search");
+      // resultsDepsDiv ataması kaldırıldı
+      resultsDomainsDiv = document.getElementById("results-domains");
+      searchPredefinedButton = document.getElementById("searchPredefined");
+      extractDomainsButton = document.getElementById("extractDomains");
+      loaderText = document.getElementById("loader-text");
+      // URL Element Atamaları kaldırıldı
+
+      // --- Olay Dinleyicileri ---
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        loadFile(file);
+      });
+      // fetchUrlButton listener kaldırıldı
+
+      // --- Drag & Drop ---
+      window.addEventListener('dragenter', (e) => { e.preventDefault(); dropOverlay.style.display = 'flex'; });
+      dropOverlay.addEventListener('dragleave', (e) => { e.preventDefault(); dropOverlay.style.display = 'none'; });
+      dropOverlay.addEventListener('dragover', (e) => { e.preventDefault(); });
+      dropOverlay.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropOverlay.style.display = 'none';
+        if (e.dataTransfer.files.length > 0) {
+          const file = e.dataTransfer.files[0];
+          loadFile(file);
+        }
+      });
+
+      // --- Sağ Tık Menüsü ---
+      treeView.addEventListener('contextmenu', (e) => {
+        const targetSpan = e.target.closest('.file, .folder');
+        if (!targetSpan) { contextMenu.style.display = 'none'; return; }
+        e.preventDefault();
+        const path = targetSpan.dataset.path;
+        const isFile = targetSpan.classList.contains('file');
+        contextMenu.innerHTML = ''; 
+        if (path) {
+          const copyPath = document.createElement('div');
+          copyPath.textContent = 'Copy Path';
+          copyPath.onclick = () => { navigator.clipboard.writeText(path).then(() => { contextMenu.style.display = 'none'; }); };
+          contextMenu.appendChild(copyPath);
+        }
+        if (isFile && path && fileContents[path] !== undefined) {
+          const downloadFile = document.createElement('div');
+          downloadFile.textContent = 'Download File';
+          downloadFile.onclick = () => { downloadSingleFile(path, fileContents[path]); contextMenu.style.display = 'none'; };
+          contextMenu.appendChild(downloadFile);
+        }
+        contextMenu.style.display = 'block';
+        contextMenu.style.left = `${e.clientX}px`;
+        contextMenu.style.top = `${e.clientY}px`;
+      });
+      window.addEventListener('click', () => { contextMenu.style.display = 'none'; });
+
+      // --- Bölücüler (Splitters) ---
+      let isDraggingV = false;
+      splitterV.addEventListener('mousedown', (e) => { isDraggingV = true; document.body.style.userSelect = 'none'; });
+      let isDraggingH = false;
+      splitterH.addEventListener('mousedown', (e) => { isDraggingH = true; document.body.style.userSelect = 'none'; });
+      window.addEventListener('mouseup', () => { isDraggingV = false; isDraggingH = false; document.body.style.userSelect = 'auto'; });
+      window.addEventListener('mousemove', (e) => {
+        if (isDraggingV) {
+          e.preventDefault();
+          const newWidth = e.clientX - treeView.getBoundingClientRect().left;
+          const minWidth = 200, maxWidth = document.body.clientWidth * 0.8; 
+          if (newWidth > minWidth && newWidth < maxWidth) { treeView.style.width = `${newWidth}px`; }
+        }
+        if (isDraggingH) {
+          e.preventDefault();
+          const newHeight = window.innerHeight - e.clientY - splitterH.offsetHeight - document.querySelector('footer').offsetHeight;
+          const minHeight = 50, maxHeight = document.getElementById('content-wrapper').clientHeight * 0.7;
+          if (newHeight > minHeight && newHeight < maxHeight) { bottomPanel.style.height = `${newHeight}px`; }
+        }
+      });
+
+      // --- Alt Panel Sekmeleri ---
+      bottomPanelTabs.addEventListener('click', (e) => {
+        if (e.target.classList.contains('bottom-tab')) {
+          const pageId = e.target.dataset.tabPage;
+          switchBottomTab(pageId);
+        }
+      });
+
+      // --- Ağaç Arama (Filtre) ---
+      searchInput.addEventListener('input', () => {
+        const term = searchInput.value.toLowerCase().trim();
+        const items = treeView.querySelectorAll('li');
+        if (term === '') {
+          items.forEach(li => { li.style.display = ''; });
+          return;
+        }
+        const matchedLis = [];
+        items.forEach(li => {
+          const span = li.querySelector('span:first-child'); 
+          if (span) {
+            const text = span.textContent.toLowerCase();
+            if (text.includes(term)) { li.style.display = ''; matchedLis.push(li); } 
+            else { li.style.display = 'none'; }
+          } else {
+            li.style.display = 'none';
+          }
+        });
+        matchedLis.forEach(li => {
+          let current = li.parentElement; 
+          while (current && current !== treeView) {
+            if (current.tagName === 'UL') {
+              current.classList.remove('hidden'); 
+              const parentLi = current.parentElement;
+              if (parentLi && parentLi.tagName === 'LI') {
+                parentLi.style.display = ''; 
+                const folderSpan = parentLi.querySelector('span.folder:first-child');
+                if (folderSpan) { folderSpan.classList.add('open'); }
+                current = parentLi.parentElement; 
+              } else {
+                current = current.parentElement; 
+              }
+            } else {
+              current = current.parentElement;
+            }
+          }
+        });
+      });
+
+      // --- Regex Arama ---
+      predefinedRegexSelect.addEventListener('change', () => {
+        const selectedRegex = predefinedRegexSelect.value;
+        if (selectedRegex) {
+          regexInput.value = selectedRegex;
+          performRegexSearch(selectedRegex);
+        }
+      });
+      searchPredefinedButton.addEventListener('click', () => {
+        const selectedRegex = regexInput.value.trim() || predefinedRegexSelect.value;
+        if (selectedRegex) {
+          regexInput.value = selectedRegex;
+          performRegexSearch(selectedRegex);
+        } else {
+          alert("Please select or enter a regex to search.");
+        }
+      });
+
+      // --- Domain Çıkarıcı ---
+      extractDomainsButton.addEventListener('click', () => {
+        switchBottomTab('results-domains');
+        showLoader("Extracting domains...");
+        setTimeout(() => {
+          resultsDomainsDiv.innerHTML = '';
+          const domainRegex = /(?:https?|ftp):\/\/(?:www\.)?([a-zA-Z0-9.-]+(?:\.[a-zA-Z]{2,6}))(?:\/[^\s]*)?/gi;
+          const domains = new Set();
+          for (const [path, content] of Object.entries(fileContents)) {
+            if (content && content.match) {
+              let match;
+              while ((match = domainRegex.exec(content)) !== null) {
+                if (match[1]) { domains.add(match[1]); }
+              }
+            }
+          }
+          if (domains.size === 0) {
+            resultsDomainsDiv.innerHTML = '<i>No domains found.</i>';
+          } else {
+            const ul = document.createElement('ul');
+            domains.forEach(domain => {
+              const li = document.createElement('li');
+              li.textContent = domain;
+              ul.appendChild(li);
+            });
+            resultsDomainsDiv.appendChild(ul);
+          }
+          hideLoader();
+        }, 50);
+      });
+
+      // --- Diğer Butonlar ---
+      wordWrapButton.addEventListener('click', () => {
+        previewContent.classList.toggle('word-wrap');
+        wordWrapButton.classList.toggle('active');
+      });
+      expandAllButton.addEventListener('click', () => {
+        treeView.querySelectorAll('ul').forEach(ul => { ul.classList.remove('hidden'); });
+        treeView.querySelectorAll('.folder').forEach(folder => { folder.classList.add('open'); });
+      });
+      collapseAllButton.addEventListener('click', () => {
+        treeView.querySelectorAll('li > ul').forEach(ul => { ul.classList.add('hidden'); });
+        treeView.querySelectorAll('.folder').forEach(folder => { folder.classList.remove('open'); });
+      });
+
+    }); // --- DOMContentLoaded Sonu ---
+
+
+    // --- Fonksiyonlar ---
+
+    function showLoader(message = null) {
+      loader.style.display = 'flex';
+      clearInterval(loaderInterval); 
+      if (message) {
+        loaderText.textContent = message;
+      } else {
+        const texts = ["Analyzing...", "Parsing...", "Deobfuscating...", "Building Tree..."];
+        let i = 0;
+        loaderText.textContent = texts[i];
+        loaderInterval = setInterval(() => {
+          i = (i + 1) % texts.length;
+          loaderText.textContent = texts[i];
+        }, 750);
+      }
+    }
+    function hideLoader() {
+      loader.style.display = 'none';
+      clearInterval(loaderInterval);
+    }
+
+    function switchBottomTab(pageId) {
+      if (!bottomPanelTabs || !bottomPanelContent) return;
+      bottomPanelTabs.querySelectorAll('.bottom-tab').forEach(tab => tab.classList.remove('active'));
+      bottomPanelContent.querySelectorAll('.bottom-panel-page').forEach(page => page.classList.remove('active'));
+      const tabToActivate = bottomPanelTabs.querySelector(`.bottom-tab[data-tab-page="${pageId}"]`);
+      const pageToActivate = document.getElementById(pageId);
+      if (tabToActivate) tabToActivate.classList.add('active');
+      if (pageToActivate) pageToActivate.classList.add('active');
+    }
+
+    // fetchAndLoadMap fonksiyonu kaldırıldı
+    // processMapContent fonksiyonu güncellendi (analyzeDependencies çağrısı kaldırıldı)
+    function processMapContent(content, fileName) {
+      try {
+        const jsmap = JSON.parse(content);
+        const sources = jsmap.sources || [];
+        const sourcesContent = jsmap.sourcesContent || [];
+        fileContents = {};
+        sources.forEach((src, idx) => {
+          fileContents[src] = sourcesContent[idx] || "(No content)";
+        });
+        renderTree(buildTree(sources));
+        resultsSearchDiv.innerHTML = "<i>Regex search results will appear here</i>";
+        resultsDomainsDiv.innerHTML = "<i>Extracted domains will appear here</i>";
+        statusFileName.textContent = fileName || "Loaded Map"; // URL durumu kaldırıldı
+        statusFileCount.textContent = `${sources.length} files`;
+        currentActiveFileSpan = null; 
+        tabBar.innerHTML = '';
+        previewContent.innerHTML = '<i>Source content will be displayed here</i>';
+        // analyzeDependencies() çağrısı kaldırıldı
+      } catch (err) {
+        console.error("Error parsing .map file:", err);
+        alert("Invalid or corrupt .js.map file. Check console for details."); 
+      } finally {
+        hideLoader();
+      }
+    }
+
+    function loadFile(file) {
+      if (!file || !file.name.endsWith('.map')) {
+        alert("Please provide a valid .js.map file.");
+        return;
+      }
+      showLoader("Loading from file...");
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        processMapContent(event.target.result, file.name);
+      };
+      reader.readAsText(file);
+    }
+
+    function downloadSingleFile(filename, content) {
+      const blob = new Blob([content], {type: 'text/plain;charset=utf-8'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename.split('/').pop(); 
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
+
+    function buildTree(paths) {
+      const root = {};
+      for (const path of paths) {
+        const parts = path.split("/");
+        let current = root;
+        for (const part of parts) {
+          if (!current[part]) current[part] = {};
+          current = current[part];
+        }
+      }
+      return root;
+    }
+
+    function renderTree(tree, parent = treeView) {
+      parent.innerHTML = '';
+      const ul = document.createElement('ul');
+      parent.appendChild(ul);
+      renderNode(tree, ul, '');
+      ul.childNodes.forEach(li => {
+        const folderSpan = li.querySelector(':scope > .folder');
+        const subUl = li.querySelector(':scope > ul');
+        if (folderSpan && subUl) {
+          folderSpan.classList.add('open');
+          subUl.classList.remove('hidden');
+        }
+      });
+    }
+
+    function renderNode(node, container, fullPath) {
+      for (const key in node) {
+        const li = document.createElement('li');
+        const path = fullPath ? `${fullPath}/${key}` : key;
+        if (Object.keys(node[key]).length === 0) { 
+          const span = document.createElement('span');
+          const ext = key.split('.').pop().toLowerCase();
+          span.className = 'file';
+          span.classList.add(`file-${ext}`);
+          span.dataset.path = path; 
+          const textNode = document.createTextNode(key); 
+          span.appendChild(textNode);
+          span.onclick = () => { previewFile(path, null); };
+          li.appendChild(span);
+        } else { 
+          const folder = document.createElement('span');
+          folder.className = 'folder';
+          folder.dataset.path = path; 
+          const textNode = document.createTextNode(key);
+          folder.appendChild(textNode);
+          const subUL = document.createElement('ul');
+          subUL.className = 'hidden'; 
+          folder.onclick = () => {
+            subUL.classList.toggle('hidden');
+            folder.classList.toggle('open');
+          };
+          li.appendChild(folder);
+          renderNode(node[key], subUL, path);
+          li.appendChild(subUL);
+        }
+        container.appendChild(li);
+      }
+    }
+
+    function previewFile(path, highlightRegex = null, lineToScrollTo = null) {
+      const safePath = path.replace(/["'\\]/g, '\\$&');
+      let tab = tabBar.querySelector(`.tab[data-path="${safePath}"]`);
+      if (!tab) {
+        tab = document.createElement('div');
+        tab.className = 'tab';
+        tab.dataset.path = path;
+        const tabName = document.createElement('span');
+        tabName.className = 'tab-name';
+        tabName.textContent = path.split('/').pop();
+        const tabClose = document.createElement('span');
+        tabClose.className = 'tab-close';
+        tabClose.innerHTML = '&times;';
+        tabClose.onclick = (e) => { e.stopPropagation(); closeTab(path); };
+        tab.onclick = () => { previewFile(path, null); };
+        tab.appendChild(tabName);
+        tab.appendChild(tabClose);
+        tabBar.appendChild(tab);
+      }
+      tabBar.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      tab.scrollIntoView(); 
+      showFileContent(path, highlightRegex, lineToScrollTo);
+    }
+    
+    function closeTab(path) {
+      const safePath = path.replace(/["'\\]/g, '\\$&');
+      const tabToClose = tabBar.querySelector(`.tab[data-path="${safePath}"]`);
+      if (tabToClose) {
+        const wasActive = tabToClose.classList.contains('active');
+        const nextTab = tabToClose.nextElementSibling || tabToClose.previousElementSibling;
+        tabToClose.remove();
+        if (wasActive && nextTab) {
+          previewFile(nextTab.dataset.path, null);
+        } else if (wasActive && tabBar.children.length === 0) {
+          previewContent.innerHTML = '<i>Source content will be displayed here</i>';
+          if (currentActiveFileSpan) {
+            currentActiveFileSpan.classList.remove('active-file');
+            currentActiveFileSpan = null;
+          }
+        }
+      }
+    }
+
+    function showFileContent(path, highlightRegex = null, lineToScrollTo = null) {
+      const content = fileContents[path];
+      if (currentActiveFileSpan) { currentActiveFileSpan.classList.remove('active-file'); }
+      const safePath = path.replace(/["'\\]/g, '\\$&');
+      const newActiveSpan = document.querySelector(`.file[data-path="${safePath}"]`);
+      if (newActiveSpan) {
+        newActiveSpan.classList.add('active-file');
+        currentActiveFileSpan = newActiveSpan;
+        newActiveSpan.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      if (content !== undefined) {
+        const ext = path.split('.').pop().toLowerCase();
+        let lang = 'plaintext';
+        if (['js', 'mjs'].includes(ext)) lang = 'javascript';
+        else if (ext === 'html') lang = 'html';
+        else if (ext === 'ts') lang = 'typescript';
+        else if (ext === 'json') lang = 'json';
+        else if (ext === 'css') lang = 'css';
+        else if (ext === 'vue') lang = 'html';
+        else if (ext === 'md') lang = 'markdown';
+        let formattedContent = escapeHtml(content);
+        let lines = formattedContent.split('\n');
+        lines = lines.map((line, index) => {
+          let lineContent = line;
+          if (highlightRegex) {
+            lineContent = lineContent.replace(highlightRegex, '<span class="highlight">$&</span>');
+          }
+          return `<span class="code-line" data-line="${index + 1}">${lineContent}</span>`;
+        });
+        previewContent.innerHTML = `<pre><code class="language-${lang}">${lines.join('\n')}</code></pre>`;
+        const codeBlock = previewContent.querySelector('code');
+        if (codeBlock) { hljs.highlightElement(codeBlock); }
+        if (lineToScrollTo) {
+          const targetLine = previewContent.querySelector(`.code-line[data-line="${lineToScrollTo}"]`);
+          if (targetLine) {
+            targetLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetLine.classList.add('line-highlight');
+            setTimeout(() => { targetLine.classList.remove('line-highlight'); }, 2000); 
+          }
+        }
+      } else {
+        previewContent.innerHTML = `<b>Content not found:</b> ${path}`;
+      }
+    }
+
+    function escapeHtml(text) {
+      if (typeof text !== 'string') return '';
+      return text.replace(/[&<>"']/g, function (m) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[m];
+      });
+    }
+
+    function performRegexSearch(pattern) {
+      resultsSearchDiv.innerHTML = ''; 
+      if (!pattern) {
+        resultsSearchDiv.innerHTML = '<i>Regex search results will appear here</i>';
+        return;
+      }
+      switchBottomTab('results-search');
+      showLoader("Searching...");
+      setTimeout(() => {
+        let regex;
+        try {
+          // 's' flagı (dotAll) eklenerek Private Key gibi çok satırlı bloklar yakalanabilir
+          regex = new RegExp(pattern, 'gis'); 
+        } catch (err) {
+          resultsSearchDiv.innerHTML = `<span style="color:red">Invalid regex: ${err.message}</span>`;
+          hideLoader();
+          return;
+        }
+        let foundFiles = {}; 
+        for (const [path, content] of Object.entries(fileContents)) {
+          if (!content || !content.split) continue;
+          
+          // Private Key gibi çok satırlı eşleşmeler için 'matchAll' kullan
+          if (pattern.includes('BEGIN\\s+(RSA|EC|PGP|OPENSSH)\\s+PRIVATE\\s+KEY')) {
+              const matches = content.matchAll(regex);
+              for (const match of matches) {
+                  if (!foundFiles[path]) { foundFiles[path] = []; }
+                  // Çok satırlı eşleşmenin başladığı satırı bul (yaklaşık)
+                  const approxLineNumber = content.substring(0, match.index).split('\n').length;
+                  let snippetHtml = escapeHtml(match[0]); // Tüm bloğu göster
+                  // Bloğu vurgula (tek bir span ile)
+                  snippetHtml = `<span class="match-highlight">${snippetHtml}</span>`; 
+                  foundFiles[path].push({ lineNumber: approxLineNumber, snippet: snippetHtml });
+              }
+          } else {
+              // Tek satırlı eşleşmeler için eski yöntem
+              const lines = content.split('\n');
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const matches = line.match(regex);
+                if (matches) {
+                  if (!foundFiles[path]) { foundFiles[path] = []; }
+                  let snippetHtml = escapeHtml(line.trim());
+                  // Satır içindeki tüm eşleşmeleri vurgula
+                  snippetHtml = snippetHtml.replace(regex, '<span class="match-highlight">$&</span>'); 
+                  foundFiles[path].push({ lineNumber: i + 1, snippet: snippetHtml });
+                }
+              }
+          }
+        }
+        if (Object.keys(foundFiles).length === 0) {
+          resultsSearchDiv.innerHTML = `<i>No matches found for "${pattern}"</i>`;
+        } else {
+          const output = document.createElement('div');
+          output.className = 'terminal-output';
+          for (const [path, snippets] of Object.entries(foundFiles)) {
+            const group = document.createElement('div');
+            group.className = 'terminal-file-group';
+            const filePath = document.createElement('span');
+            filePath.className = 'terminal-file-path';
+            filePath.textContent = `${path}: (${snippets.length} matches)`; // Eşleşme sayısını ekle
+            group.appendChild(filePath);
+            
+            snippets.forEach(item => {
+              const snippetA = document.createElement('a');
+              snippetA.className = 'terminal-snippet';
+              snippetA.href = "#";
+              snippetA.dataset.path = path;
+              snippetA.dataset.line = item.lineNumber;
+              // Çok satırlı snippet'ler için pre tag'ı kullan
+              if (item.snippet.includes('\n')) {
+                  snippetA.innerHTML = `<span class="line-num">${item.lineNumber}:</span> <pre style="display:inline; margin:0; padding:0; white-space: pre-wrap;">${item.snippet}</pre>`;
+              } else {
+                  snippetA.innerHTML = `<span class="line-num">${item.lineNumber}:</span> ${item.snippet}`;
+              }
+              snippetA.onclick = (e) => {
+                e.preventDefault(); 
+                previewFile(path, regex, item.lineNumber); 
+              };
+              group.appendChild(snippetA);
+            });
+            output.appendChild(group);
+          }
+          resultsSearchDiv.appendChild(output);
+        }
+        hideLoader();
+      }, 50); 
+    }
+
+    // analyzeDependencies fonksiyonu kaldırıldı
+
+  </script>
+</body>
+</html>
